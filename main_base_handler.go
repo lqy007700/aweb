@@ -5,25 +5,39 @@ import (
 	"net/http"
 )
 
+type Routable interface {
+	Route(method, pattern string, handle func(ctx *Context))
+}
+
+type Handle interface {
+	ServeHTTP(c *Context)
+	Routable
+}
+
 type HandleBaseOnMap struct {
 	// method + # + pattern
 	router map[string]func(c *Context)
 }
 
-func NewHandleBaseOnMap() *HandleBaseOnMap {
-	return &HandleBaseOnMap{router: make(map[string]func(c *Context))}
+func (h *HandleBaseOnMap) Route(method, pattern string, handle func(ctx *Context)) {
+	key := h.key(method, pattern)
+	h.router[key] = handle
 }
 
-func (h *HandleBaseOnMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	key := h.key(r.Method, r.URL.Path)
+func (h *HandleBaseOnMap) ServeHTTP(c *Context) {
+	key := h.key(c.r.Method, c.r.URL.Path)
 	if handle, ok := h.router[key]; ok {
-		handle(newContext(w, r))
+		handle(newContext(c.w, c.r))
 	} else {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("not found"))
+		c.w.WriteHeader(http.StatusNotFound)
+		_, _ = c.w.Write([]byte("not found"))
 	}
 }
 
 func (h *HandleBaseOnMap) key(method, pattern string) string {
 	return fmt.Sprintf("%s#%s", method, pattern)
+}
+
+func NewHandleBaseOnMap() Handle {
+	return &HandleBaseOnMap{router: make(map[string]func(c *Context))}
 }

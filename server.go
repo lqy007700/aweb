@@ -36,3 +36,24 @@ func signUp(c *Context) {
 	}
 	return
 }
+
+func signUp1(c *Context) {
+	req := &signUpReq{}
+	resp := &commonResponse{
+		Data: req,
+	}
+
+	err := c.ReadJson(req)
+	if err != nil {
+		resp.Msg = err.Error()
+		c.BadRequestJson(resp)
+		return
+	}
+
+	err = c.OkJson(resp)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	return
+}

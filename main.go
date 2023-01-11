@@ -5,29 +5,44 @@ import (
 )
 
 type Server interface {
-	Route(method, pattern string, handle func(ctx *Context))
+	Routable
 	Start(addr string)
 }
 
 type aWebServer struct {
-	name     string
-	handlers *HandleBaseOnMap
+	name    string
+	handler Handle
+	root    Filter
 }
 
-func newAWebServer() Server {
+func newAWebServer(builders ...FilterBuilder) Server {
+	handler := NewHandleBaseOnMap()
+
+	var root Filter = func(ctx *Context) {
+		handler.ServeHTTP(ctx)
+	}
+
+	for i := len(builders) - 1; i >= 0; i-- {
+		b := builders[i]
+		root = b(root)
+	}
+
 	return &aWebServer{
-		name:     "app",
-		handlers: NewHandleBaseOnMap(),
+		name:    "app",
+		handler: handler,
+		root:    root,
 	}
 }
 
 func (a *aWebServer) Route(method, pattern string, handle func(ctx *Context)) {
-	key := a.handlers.key(method, pattern)
-	a.handlers.router[key] = handle
+	a.handler.Route(method, pattern, handle)
 }
 
 func (a *aWebServer) Start(addr string) {
-	http.Handle("/", a.handlers)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		c := newContext(w, r)
+		a.root(c)
+	})
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		panic(err)
@@ -35,7 +50,9 @@ func (a *aWebServer) Start(addr string) {
 }
 
 func main() {
-	srv := newAWebServer()
+	srv := newAWebServer(Builder, Aprint)
 	srv.Route("POST", "/sign", signUp)
+	srv.Route("POST", "/sign1", signUp1)
+
 	srv.Start(":8080")
 }
