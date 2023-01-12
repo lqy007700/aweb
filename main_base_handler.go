@@ -5,10 +5,6 @@ import (
 	"net/http"
 )
 
-type Routable interface {
-	Route(method, pattern string, handle handleFunc)
-}
-
 type Handle interface {
 	ServeHTTP(c *Context)
 	Routable

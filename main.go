@@ -48,8 +48,8 @@ func (a *aWebServer) Start(addr string) {
 
 func main() {
 	srv := newAWebServer(Builder, Aprint)
-	srv.Route("POST", "/sign", signUp)
-	srv.Route("POST", "/sign1", signUp1)
+	srv.Route("POST", "/sign/*", signUp)
+	srv.Route("POST", "/sign/*/name", signUp1)
 
 	srv.Start(":8080")
 }

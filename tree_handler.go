@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -24,23 +25,16 @@ func newNode(path string) *node {
 }
 
 func (h *HandlerBaseOnTree) ServeHTTP(c *Context) {
-	node := h.root.matchRoute(c.r.URL.Path)
-	if node != nil && node.handler != nil {
-		node.handler(c)
-	} else {
-		err := c.BadRequestJson(commonResponse{
-			BizCode: 1,
-			Msg:     "路由不存在",
-		})
-		if err != nil {
-			return
-		}
+	handler, ok := h.root.findRouter(c.r.URL.Path)
+	if !ok {
+		_ = c.BadRequestJson(commonResponse{BizCode: 1, Msg: "路由不存在"})
+		return
 	}
+	handler(c)
 }
 
 func (h *HandlerBaseOnTree) Route(method, pattern string, handle handleFunc) {
-	pattern = strings.Trim(pattern, "/")
-	paths := strings.Split(pattern, "/")
+	paths := strings.Split(strings.Trim(pattern, "/"), "/")
 
 	cur := h.root
 	for idx, path := range paths {
@@ -66,26 +60,34 @@ func (n *node) createSubTree(path []string, handle handleFunc) {
 }
 
 func (n *node) findMatchChild(path string) (*node, bool) {
+	var wildcard *node
+
 	for _, child := range n.children {
-		if child.path == path {
+		if child.path == path && child.path != "*" {
 			return child, true
 		}
+
+		if child.path == "*" {
+			wildcard = child
+		}
 	}
-	return nil, false
+	return wildcard, wildcard != nil
 }
 
-func (n *node) matchRoute(pattern string) *node {
-	pattern = strings.Trim(pattern, "/")
-	paths := strings.Split(pattern, "/")
+func (n *node) findRouter(pattern string) (handleFunc, bool) {
+	paths := strings.Split(strings.Trim(pattern, "/"), "/")
 
 	cur := n
 	for _, path := range paths {
 		matchChild, ok := cur.findMatchChild(path)
-		if ok {
-			cur = matchChild
-		} else {
-			cur = nil
+		if !ok {
+			return nil, false
 		}
+		cur = matchChild
 	}
-	return cur
+
+	if cur.handler == nil {
+		return nil, false
+	}
+	return cur.handler, true
 }

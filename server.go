@@ -19,7 +19,7 @@ type commonResponse struct {
 func signUp(c *Context) {
 	req := &signUpReq{}
 	resp := &commonResponse{
-		Data: req,
+		Data: "signUp",
 	}
 
 	err := c.ReadJson(req)
@@ -40,7 +40,7 @@ func signUp(c *Context) {
 func signUp1(c *Context) {
 	req := &signUpReq{}
 	resp := &commonResponse{
-		Data: req,
+		Data: "signUp1",
 	}
 
 	err := c.ReadJson(req)
