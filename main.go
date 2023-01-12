@@ -16,12 +16,9 @@ type aWebServer struct {
 }
 
 func newAWebServer(builders ...FilterBuilder) Server {
-	handler := NewHandleBaseOnMap()
+	handler := NewHandlerBaseOnTree()
 
-	var root Filter = func(ctx *Context) {
-		handler.ServeHTTP(ctx)
-	}
-
+	var root Filter = handler.ServeHTTP
 	for i := len(builders) - 1; i >= 0; i-- {
 		b := builders[i]
 		root = b(root)
@@ -34,7 +31,7 @@ func newAWebServer(builders ...FilterBuilder) Server {
 	}
 }
 
-func (a *aWebServer) Route(method, pattern string, handle func(ctx *Context)) {
+func (a *aWebServer) Route(method, pattern string, handle handleFunc) {
 	a.handler.Route(method, pattern, handle)
 }
 

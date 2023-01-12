@@ -5,9 +5,11 @@ import (
 	"time"
 )
 
+type handleFunc func(ctx *Context)
+
 type FilterBuilder func(next Filter) Filter
 
-type Filter func(ctx *Context)
+type Filter handleFunc
 
 //var _ FilterBuilder = Builder
 
