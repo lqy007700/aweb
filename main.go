@@ -31,8 +31,9 @@ func newAWebServer(builders ...FilterBuilder) Server {
 	}
 }
 
-func (a *aWebServer) Route(method, pattern string, handle handleFunc) {
-	a.handler.Route(method, pattern, handle)
+func (a *aWebServer) Route(method, pattern string, handle handleFunc) error {
+	err := a.handler.Route(method, pattern, handle)
+	return err
 }
 
 func (a *aWebServer) Start(addr string) {

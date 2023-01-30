@@ -1,27 +1,35 @@
 package main
 
 import (
-	"fmt"
+	"errors"
+	"net/http"
 	"strings"
 )
 
+var ErrorInvalidRouterPattern = errors.New("invalid router pattern")
+var ErrorInvalidMethod = errors.New("invalid method")
+var ErrorRouterNotFound = errors.New("router not found")
+
+var supportMethods = [4]string{
+	http.MethodGet,
+	http.MethodPost,
+	http.MethodPut,
+	http.MethodDelete,
+}
+
 type HandlerBaseOnTree struct {
-	root *node
+	forest map[string]*node
 }
 
 func NewHandlerBaseOnTree() *HandlerBaseOnTree {
-	return &HandlerBaseOnTree{root: newNode("/")}
-}
+	forests := make(map[string]*node, len(supportMethods))
+	for _, m := range supportMethods {
+		forests[m] = newRootNode(m)
+	}
 
-type node struct {
-	path     string
-	children []*node
-
-	handler handleFunc
-}
-
-func newNode(path string) *node {
-	return &node{path: path, children: make([]*node, 0)}
+	return &HandlerBaseOnTree{
+		forest: forests,
+	}
 }
 
 func (h *HandlerBaseOnTree) ServeHTTP(c *Context) {
@@ -33,10 +41,19 @@ func (h *HandlerBaseOnTree) ServeHTTP(c *Context) {
 	handler(c)
 }
 
-func (h *HandlerBaseOnTree) Route(method, pattern string, handle handleFunc) {
+func (h *HandlerBaseOnTree) Route(method, pattern string, handle handleFunc) error {
+	err := h.validatePattern(pattern)
+	if err != nil {
+		return err
+	}
+
 	paths := strings.Split(strings.Trim(pattern, "/"), "/")
 
-	cur := h.root
+	cur, ok := h.forest[method]
+	if !ok {
+		return ErrorInvalidMethod
+	}
+
 	for idx, path := range paths {
 		matchChild, ok := cur.findMatchChild(path)
 		if ok {
@@ -46,6 +63,24 @@ func (h *HandlerBaseOnTree) Route(method, pattern string, handle handleFunc) {
 			return
 		}
 	}
+}
+
+/**
+检测路由规范
+1/ 校验 *，如果存在，必须在最后一个，并且它前面必须是/
+*/
+func (h *HandlerBaseOnTree) validatePattern(pattern string) error {
+	index := strings.Index(pattern, _any)
+	if index > 0 {
+		if index != len(pattern)-1 {
+			return ErrorInvalidRouterPattern
+		}
+
+		if pattern[index-1] != '/' {
+			return ErrorInvalidRouterPattern
+		}
+	}
+	return nil
 }
 
 // 创建节点 绑定handle

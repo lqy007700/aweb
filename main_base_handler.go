@@ -5,11 +5,6 @@ import (
 	"net/http"
 )
 
-type Handle interface {
-	ServeHTTP(c *Context)
-	Routable
-}
-
 type HandleBaseOnMap struct {
 	// method + # + pattern
 	router map[string]func(c *Context)
