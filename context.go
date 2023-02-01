@@ -7,47 +7,41 @@ import (
 )
 
 type Context struct {
-	w          http.ResponseWriter
-	r          *http.Request
-	PathParams map[string]string
+	w http.ResponseWriter
+	r *http.Request
 }
 
-func (c *Context) ReadJson(obj interface{}) error {
+func NewContext(w http.ResponseWriter, r *http.Request) *Context {
+	return &Context{w: w, r: r}
+}
+
+func (c *Context) ReadJson(data interface{}) error {
 	all, err := io.ReadAll(c.r.Body)
 	if err != nil {
 		return err
 	}
-
-	err = json.Unmarshal(all, obj)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	err = json.Unmarshal(all, data)
+	return err
 }
 
-func (c *Context) WriteJson(code int, resp interface{}) error {
+func (c *Context) WriteJson(code int, data interface{}) error {
 	c.w.WriteHeader(code)
-
-	marshal, err := json.Marshal(resp)
+	marshal, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-
 	_, err = c.w.Write(marshal)
 	return err
 }
 
-func (c *Context) OkJson(resp interface{}) error {
-	err := c.WriteJson(http.StatusOK, resp)
-	return err
+func (c *Context) OkJson(data interface{}) error {
+	return c.WriteJson(http.StatusOK, data)
 }
 
-func (c *Context) BadRequestJson(resp interface{}) error {
-	err := c.WriteJson(http.StatusNotFound, resp)
-	return err
+func (c *Context) BadJson(data interface{}) error {
+	return c.WriteJson(http.StatusBadRequest, data)
 }
 
-func newContext(w http.ResponseWriter, r *http.Request) *Context {
-	return &Context{w: w, r: r, PathParams: make(map[string]string)}
+func (c *Context) ShutdownJson() error {
+	return c.WriteJson(http.StatusServiceUnavailable, nil)
 }

@@ -1,8 +1,8 @@
 package main
 
-type handleFunc func(ctx *Context)
+type HandlerFunc func(c *Context)
 
-type Handle interface {
-	ServeHTTP(c *Context)
+type Handler interface {
+	ServeHTTP(ctx *Context)
 	Routable
 }

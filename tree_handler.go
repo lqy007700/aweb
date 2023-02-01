@@ -1,128 +1,113 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 )
 
-var ErrorInvalidRouterPattern = errors.New("invalid router pattern")
-var ErrorInvalidMethod = errors.New("invalid method")
-var ErrorRouterNotFound = errors.New("router not found")
-
-var supportMethods = [4]string{
+var supperMethods = [4]string{
 	http.MethodGet,
 	http.MethodPost,
-	http.MethodPut,
 	http.MethodDelete,
+	http.MethodPut,
 }
 
-type HandlerBaseOnTree struct {
-	forest map[string]*node
+type HandlerOnTree struct {
+	paths map[string]*node
 }
 
-func NewHandlerBaseOnTree() *HandlerBaseOnTree {
-	forests := make(map[string]*node, len(supportMethods))
-	for _, m := range supportMethods {
-		forests[m] = newRootNode(m)
+func NewHandlerOnTree() Handler {
+	paths := make(map[string]*node, len(supperMethods))
+	for _, method := range supperMethods {
+		paths[method] = newRootNode()
 	}
+	return &HandlerOnTree{paths: paths}
+}
 
-	return &HandlerBaseOnTree{
-		forest: forests,
+type node struct {
+	children []*node
+	handler  HandlerFunc
+	pattern  string
+}
+
+func newRootNode() *node {
+	return &node{
+		children: make([]*node, 0),
+	}
+}
+func newNode(path string) *node {
+	return &node{
+		children: make([]*node, 0),
+		pattern:  path,
 	}
 }
 
-func (h *HandlerBaseOnTree) ServeHTTP(c *Context) {
-	handler, ok := h.root.findRouter(c.r.URL.Path)
+func (h *HandlerOnTree) ServeHTTP(ctx *Context) {
+	handler, ok := h.findRouter(ctx)
 	if !ok {
-		_ = c.BadRequestJson(commonResponse{BizCode: 1, Msg: "路由不存在"})
+		ctx.BadJson(commonResp{
+			Code: -1,
+			Msg:  ErrorRouterNotFound.Error(),
+			Data: nil,
+		})
 		return
 	}
-	handler(c)
+	handler(ctx)
 }
 
-func (h *HandlerBaseOnTree) Route(method, pattern string, handle handleFunc) error {
-	err := h.validatePattern(pattern)
-	if err != nil {
-		return err
-	}
-
-	paths := strings.Split(strings.Trim(pattern, "/"), "/")
-
-	cur, ok := h.forest[method]
+func (h *HandlerOnTree) Route(method, pattern string, handler HandlerFunc) error {
+	cur, ok := h.paths[method]
 	if !ok {
 		return ErrorInvalidMethod
 	}
-
-	for idx, path := range paths {
-		matchChild, ok := cur.findMatchChild(path)
+	paths := strings.Split(strings.Trim(pattern, "/"), "/")
+	for i, path := range paths {
+		child, ok := h.findMatchChild(cur, path)
 		if ok {
-			cur = matchChild
+			cur = child
 		} else {
-			cur.createSubTree(paths[idx:], handle)
-			return
-		}
-	}
-}
-
-/**
-检测路由规范
-1/ 校验 *，如果存在，必须在最后一个，并且它前面必须是/
-*/
-func (h *HandlerBaseOnTree) validatePattern(pattern string) error {
-	index := strings.Index(pattern, _any)
-	if index > 0 {
-		if index != len(pattern)-1 {
-			return ErrorInvalidRouterPattern
-		}
-
-		if pattern[index-1] != '/' {
-			return ErrorInvalidRouterPattern
+			h.createSubTree(cur, paths[i:], handler)
+			return nil
 		}
 	}
 	return nil
 }
 
-// 创建节点 绑定handle
-func (n *node) createSubTree(path []string, handle handleFunc) {
-	cur := n
-	for _, s := range path {
-		nn := newNode(s)
-		cur.children = append(cur.children, nn)
-		cur = nn
+// 查找路由
+func (h *HandlerOnTree) findRouter(ctx *Context) (HandlerFunc, bool) {
+	path := ctx.r.URL.Path
+	paths := strings.Split(strings.Trim(path, "/"), "/")
+	cur, ok := h.paths[ctx.r.Method]
+	if !ok {
+		return nil, false
 	}
-	cur.handler = handle
-}
 
-func (n *node) findMatchChild(path string) (*node, bool) {
-	var wildcard *node
-
-	for _, child := range n.children {
-		if child.path == path && child.path != "*" {
-			return child, true
-		}
-
-		if child.path == "*" {
-			wildcard = child
-		}
-	}
-	return wildcard, wildcard != nil
-}
-
-func (n *node) findRouter(pattern string) (handleFunc, bool) {
-	paths := strings.Split(strings.Trim(pattern, "/"), "/")
-
-	cur := n
-	for _, path := range paths {
-		matchChild, ok := cur.findMatchChild(path)
+	for _, p := range paths {
+		child, ok := h.findMatchChild(cur, p)
 		if !ok {
 			return nil, false
 		}
-		cur = matchChild
-	}
-
-	if cur.handler == nil {
-		return nil, false
+		cur = child
 	}
 	return cur.handler, true
+}
+
+func (h *HandlerOnTree) findMatchChild(cur *node, p string) (*node, bool) {
+	for _, child := range cur.children {
+		if child.pattern == p {
+			return child, true
+		}
+	}
+	return nil, false
+}
+
+// 创建节点
+func (h *HandlerOnTree) createSubTree(root *node, patterns []string, handler HandlerFunc) {
+	cur := root
+	for _, path := range patterns {
+		n := newNode(path)
+		cur.children = append(cur.children, n)
+		cur = n
+	}
+	cur.handler = handler
 }

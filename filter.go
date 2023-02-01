@@ -1,28 +1,28 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"time"
 )
 
+type Filter func(c *Context)
+
 type FilterBuilder func(next Filter) Filter
 
-type Filter handleFunc
-
-//var _ FilterBuilder = Builder
-
-func Builder(next Filter) Filter {
-	return func(ctx *Context) {
-		s := time.Now().Nanosecond()
-		next(ctx)
-		e := time.Now().Nanosecond()
-		fmt.Println(e - s)
+// FilterReqLog 记录请求日志
+func FilterReqLog(next Filter) Filter {
+	return func(c *Context) {
+		log.Println(c.r.URL)
+		next(c)
 	}
 }
 
-func Aprint(next Filter) Filter {
-	return func(ctx *Context) {
-		fmt.Println(1)
-		next(ctx)
+// FilterReqTime 记录请求时间
+func FilterReqTime(next Filter) Filter {
+	return func(c *Context) {
+		s := time.Now().UnixNano()
+		next(c)
+		e := time.Now().UnixNano()
+		log.Println(e - s)
 	}
 }
