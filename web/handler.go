@@ -1,4 +1,4 @@
-package main
+package web
 
 type HandlerFunc func(c *Context)
 

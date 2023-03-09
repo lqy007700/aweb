@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"log"
@@ -12,7 +12,7 @@ type FilterBuilder func(next Filter) Filter
 // FilterReqLog 记录请求日志
 func FilterReqLog(next Filter) Filter {
 	return func(c *Context) {
-		log.Println(c.r.URL)
+		log.Println(c.R.URL)
 		next(c)
 	}
 }

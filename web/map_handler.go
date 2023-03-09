@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"fmt"
@@ -12,10 +12,9 @@ func NewHandlerOnMap() Handler {
 	return &HandlerOnMap{handlers: make(map[string]HandlerFunc)}
 }
 
-func (h *HandlerOnMap) Route(method, pattern string, handler HandlerFunc) error {
+func (h *HandlerOnMap) Route(method, pattern string, handler HandlerFunc, ms ...Middleware) {
 	k := h.key(method, pattern)
 	h.handlers[k] = handler
-	return nil
 }
 
 func (h *HandlerOnMap) key(method string, pattern string) string {
@@ -23,7 +22,7 @@ func (h *HandlerOnMap) key(method string, pattern string) string {
 }
 
 func (h *HandlerOnMap) ServeHTTP(c *Context) {
-	k := h.key(c.r.Method, c.r.URL.Path)
+	k := h.key(c.R.Method, c.R.URL.Path)
 	if handler, ok := h.handlers[k]; ok {
 		handler(c)
 	} else {

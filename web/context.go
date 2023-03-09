@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"encoding/json"
@@ -8,15 +8,15 @@ import (
 
 type Context struct {
 	w http.ResponseWriter
-	r *http.Request
+	R *http.Request
 }
 
 func NewContext(w http.ResponseWriter, r *http.Request) *Context {
-	return &Context{w: w, r: r}
+	return &Context{w: w, R: r}
 }
 
 func (c *Context) ReadJson(data interface{}) error {
-	all, err := io.ReadAll(c.r.Body)
+	all, err := io.ReadAll(c.R.Body)
 	if err != nil {
 		return err
 	}

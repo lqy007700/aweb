@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"net/http"
@@ -28,6 +28,7 @@ type node struct {
 	children []*node
 	handler  HandlerFunc
 	pattern  string
+	midls    []Middleware
 }
 
 func newRootNode() *node {
@@ -43,7 +44,7 @@ func newNode(path string) *node {
 }
 
 func (h *HandlerOnTree) ServeHTTP(ctx *Context) {
-	handler, ok := h.findRouter(ctx)
+	n, ok := h.findRouter(ctx)
 	if !ok {
 		ctx.BadJson(commonResp{
 			Code: -1,
@@ -52,13 +53,31 @@ func (h *HandlerOnTree) ServeHTTP(ctx *Context) {
 		})
 		return
 	}
-	handler(ctx)
+
+	// middleware
+	// 最后一个应该是执行用户代码
+	var root HandlerFunc = func(ctx *Context) {
+		if !ok || n == nil || n.handler == nil {
+			ctx.BadJson(commonResp{
+				Code: -1,
+				Msg:  ErrorRouterNotFound.Error(),
+				Data: nil,
+			})
+			return
+		}
+		n.handler(ctx)
+	}
+
+	for i := len(n.midls) - 1; i >= 0; i-- {
+		root = n.midls[i](root)
+	}
+	root(ctx)
 }
 
-func (h *HandlerOnTree) Route(method, pattern string, handler HandlerFunc) error {
+func (h *HandlerOnTree) Route(method, pattern string, handler HandlerFunc, ms ...Middleware) {
 	cur, ok := h.paths[method]
 	if !ok {
-		return ErrorInvalidMethod
+		panic(ErrorInvalidMethod)
 	}
 	paths := strings.Split(strings.Trim(pattern, "/"), "/")
 	for i, path := range paths {
@@ -66,18 +85,17 @@ func (h *HandlerOnTree) Route(method, pattern string, handler HandlerFunc) error
 		if ok {
 			cur = child
 		} else {
-			h.createSubTree(cur, paths[i:], handler)
-			return nil
+			h.createSubTree(cur, paths[i:], handler, ms...)
+			return
 		}
 	}
-	return nil
 }
 
 // 查找路由
-func (h *HandlerOnTree) findRouter(ctx *Context) (HandlerFunc, bool) {
-	path := ctx.r.URL.Path
+func (h *HandlerOnTree) findRouter(ctx *Context) (*node, bool) {
+	path := ctx.R.URL.Path
 	paths := strings.Split(strings.Trim(path, "/"), "/")
-	cur, ok := h.paths[ctx.r.Method]
+	cur, ok := h.paths[ctx.R.Method]
 	if !ok {
 		return nil, false
 	}
@@ -89,7 +107,7 @@ func (h *HandlerOnTree) findRouter(ctx *Context) (HandlerFunc, bool) {
 		}
 		cur = child
 	}
-	return cur.handler, true
+	return cur, true
 }
 
 func (h *HandlerOnTree) findMatchChild(cur *node, p string) (*node, bool) {
@@ -102,7 +120,7 @@ func (h *HandlerOnTree) findMatchChild(cur *node, p string) (*node, bool) {
 }
 
 // 创建节点
-func (h *HandlerOnTree) createSubTree(root *node, patterns []string, handler HandlerFunc) {
+func (h *HandlerOnTree) createSubTree(root *node, patterns []string, handler HandlerFunc, ms ...Middleware) {
 	cur := root
 	for _, path := range patterns {
 		n := newNode(path)
@@ -110,4 +128,5 @@ func (h *HandlerOnTree) createSubTree(root *node, patterns []string, handler Han
 		cur = n
 	}
 	cur.handler = handler
+	cur.midls = ms
 }
